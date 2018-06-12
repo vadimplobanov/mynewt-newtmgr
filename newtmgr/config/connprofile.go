@@ -62,6 +62,7 @@ const (
 	CONN_TYPE_UDP_PLAIN
 	CONN_TYPE_UDP_OIC
 	CONN_TYPE_MTECH_LORA_OIC
+	CONN_TYPE_DDS
 )
 
 var connTypeNameMap = map[ConnType]string{
@@ -74,6 +75,7 @@ var connTypeNameMap = map[ConnType]string{
 	CONN_TYPE_UDP_PLAIN:      "udp",
 	CONN_TYPE_UDP_OIC:        "oic_udp",
 	CONN_TYPE_MTECH_LORA_OIC: "oic_mtech",
+	CONN_TYPE_DDS:            "dds",
 	CONN_TYPE_NONE:           "???",
 }
 
