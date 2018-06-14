@@ -248,6 +248,10 @@ func buildSesnCfg() (sesn.SesnCfg, error) {
 		err = config.FillMtechLoraSesnCfg(mc, &sc)
 		return sc, err
 
+	case config.CONN_TYPE_DDS_PLAIN:
+		sc.MgmtProto = sesn.MGMT_PROTO_NMP
+		return sc, nil
+
 	default:
 		return sc, util.FmtNewtError("Unknown connection type: %s (%d)",
 			config.ConnTypeToString(cp.Type), int(cp.Type))
