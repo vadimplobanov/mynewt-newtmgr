@@ -13,13 +13,21 @@ INCLUDE_DIRS=lib1/dds_c/infrastructure \
              lib1/ext
 
 INCLUDES=$(foreach i, $(INCLUDE_DIRS), -I $i)
-SOURCES=$(sort $(shell find -L * -name '*.c'))
+SOURCES=$(sort $(shell find -L lib1 lib2 src -name '*.c'))
+HEADERS=$(sort $(shell find -L      lib2 src -name '*.h'))
+DEPENDS=$(patsubst %.c, dep/%.d, $(SOURCES))
 OBJECTS=$(patsubst %.c, obj/%.o, $(SOURCES))
 
 libddsmgr.a : $(OBJECTS)
 	@ar crs $@ $^
 
+dep/%.d : %.c
+	@mkdir -p $$(dirname $@)
+	@gcc $(INCLUDES) -MF $@ -MM -MT $(patsubst %.c, obj/%.o, $<) $<
+
 obj/%.o : %.c
 	@mkdir -p $$(dirname $@)
-	@gcc $(INCLUDES) -O2 -Wall -o $@ -c $^
+	@gcc $(INCLUDES) -O2 -Wall -o $@ -c $<
+
+-include $(DEPENDS)
 
