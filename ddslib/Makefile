@@ -27,7 +27,7 @@ dep/%.d : %.c
 
 obj/%.o : %.c
 	@mkdir -p $$(dirname $@)
-	@gcc $(INCLUDES) -O2 -Wall -o $@ -c $<
+	@gcc $(INCLUDES) -O2 -Wall -g -o $@ -c $<
 
 -include $(DEPENDS)
 

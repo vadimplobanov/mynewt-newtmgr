@@ -20,8 +20,6 @@
 package config
 
 import (
-	"regexp"
-
 	"mynewt.apache.org/newtmgr/newtmgr/nmutil"
 	"mynewt.apache.org/newtmgr/nmxact/nmdds"
 	"mynewt.apache.org/newt/util"
@@ -33,8 +31,8 @@ func ParseDdsConnString(cs string) (*nmdds.XportCfg, error) {
 	}
 
 	dc := nmdds.NewXportCfg()
-	dc.Target = regexp.MustCompile(cs)
-	dc.Timeout = nmutil.TxOptions().Timeout
+	dc.CommTimeout = nmutil.TxOptions().Timeout
+	dc.TargetMatch = cs
 
 	return dc, nil
 }

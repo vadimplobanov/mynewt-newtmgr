@@ -30,6 +30,7 @@ import (
 	"mynewt.apache.org/newtmgr/newtmgr/nmutil"
 	"mynewt.apache.org/newtmgr/nmxact/mtech_lora"
 	"mynewt.apache.org/newtmgr/nmxact/nmble"
+	"mynewt.apache.org/newtmgr/nmxact/nmdds"
 	"mynewt.apache.org/newtmgr/nmxact/nmserial"
 	"mynewt.apache.org/newtmgr/nmxact/sesn"
 	"mynewt.apache.org/newtmgr/nmxact/udp"
@@ -149,6 +150,13 @@ func GetXport() (xport.Xport, error) {
 	case config.CONN_TYPE_MTECH_LORA_OIC:
 		cfg := mtech_lora.NewXportCfg()
 		globalXport = mtech_lora.NewLoraXport(cfg)
+
+	case config.CONN_TYPE_DDS_PLAIN:
+		dc, err := config.ParseDdsConnString(cp.ConnString)
+		if err != nil {
+			return nil, err
+		}
+		globalXport = nmdds.NewDdsXport(dc)
 
 	default:
 		return nil, util.FmtNewtError("Unknown connection type: %s (%d)",
