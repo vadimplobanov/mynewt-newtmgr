@@ -80,16 +80,10 @@ func (dx *DdsXport) setRspSesn(s *DdsSesn) error {
 }
 
 func (dx *DdsXport) Start() error {
+	rand.Seed(time.Now().Unix())
+
 	dx.mutex.Lock()
 	defer dx.mutex.Unlock()
-
-	rc := C.ddsmgr_initialize()
-	if rc != 0 {
-		return fmt.Errorf("Failed to initialize ddsmgr library")
-	}
-
-	targetmatch := regexp.MustCompile(dx.cfg.TargetMatch)
-	devicefound := false
 
 	abstimeout := C.struct_abs_timeout{}
 	packetping := C.struct_packet_ping{}
@@ -99,18 +93,26 @@ func (dx *DdsXport) Start() error {
 	abstimeout.seconds = C.ulong(timeout.Unix())
 	abstimeout.nseconds = C.long(timeout.Nanosecond())
 
-	requestid := rand.Int()
+	rc := C.ddsmgr_initialize(&abstimeout)
+	if rc != 0 {
+		return fmt.Errorf("Failed to initialize ddsmgr library")
+	}
+
+	targetmatch := regexp.MustCompile(dx.cfg.TargetMatch)
+	devicefound := false
+
+	requestid := rand.Int31()
 	packetping.request_id = C.int(requestid)
 
 	C.ddsmgr_pong_listen()
 	C.ddsmgr_ping_send(&packetping)
 	for {
-		rc = C.ddsmgr_pong_recv(&packetpong, &abstimeout)
+		rc = C.ddsmgr_pong_recv(&abstimeout, &packetpong)
 		if rc != 0 {
 			break
 		}
 
-		in_requestid := int(packetpong.request_id)
+		in_requestid := int32(packetpong.request_id)
 		in_devicename := C.GoString(&packetpong.device_name[0])
 
 		if in_requestid != requestid {
@@ -129,7 +131,7 @@ func (dx *DdsXport) Start() error {
 		return fmt.Errorf("Could not find matching dds device")
 	}
 
-	fmt.Println("Matched dds device %s", dx.devname)
+	fmt.Println("Matched dds device", dx.devname)
 
 	return nil
 }

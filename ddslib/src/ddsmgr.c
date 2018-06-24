@@ -5,6 +5,7 @@
 
 #include "../lib2/dds.h"
 #include "ddsmgr.h"
+#include "matcherwait.h"
 #include "rendezvous.h"
 
 static int valid_ipv4_ifaddr(const struct ifaddrs *ifaddr)
@@ -87,6 +88,7 @@ static void find_ipv4_intfs(struct ipv4_intfs *intfs)
     assert(intfs->nintfs != 0);
 }
 
+static struct matcherwait init_matchwait;
 static struct rendezvous pong_rendezvous;
 
 static void convert_packet_pong(void *dst,
@@ -117,12 +119,23 @@ static void pong_received(const PacketPong *pong)
     rendezvous_produce(&pong_rendezvous, pong);
 }
 
-int ddsmgr_initialize(void)
+static void pong_submatched(void)
+{
+    matcherwait_wake(&init_matchwait, MATCHERTYPE_PONG);
+}
+
+static void ping_pubmatched(void)
+{
+    matcherwait_wake(&init_matchwait, MATCHERTYPE_PING);
+}
+
+int ddsmgr_initialize(const struct abs_timeout *timo)
 {
     struct ipv4_intfs intfs;
 
     find_ipv4_intfs(&intfs);
 
+    matcherwait_initialize(&init_matchwait);
     rendezvous_initialize(&pong_rendezvous, convert_packet_pong);
 
     if (dds_create(print_error, &intfs))
@@ -131,13 +144,13 @@ int ddsmgr_initialize(void)
         return 1;
     }
 
-    if (dds_pong_subscriber(pong_received))
+    if (dds_pong_subscriber(pong_submatched, pong_received))
     {
         fprintf(stderr, "dds_pong_subscriber failed\n");
         return 1;
     }
 
-    if (dds_ping_publisher())
+    if (dds_ping_publisher(ping_pubmatched))
     {
         fprintf(stderr, "dds_ping_publisher failed\n");
         return 1;
@@ -149,6 +162,12 @@ int ddsmgr_initialize(void)
         return 1;
     }
 
+    if (matcherwait_wait(&init_matchwait, timo))
+    {
+        fprintf(stderr, "failed to match dds client\n");
+        return 1;
+    }
+
     return 0;
 }
 
@@ -157,8 +176,8 @@ void ddsmgr_ping_send(const struct packet_ping *ping)
     dds_ping_publish(ping->request_id);
 }
 
-int ddsmgr_pong_recv(struct packet_pong *pong,
-                     const struct abs_timeout *timo)
+int ddsmgr_pong_recv(const struct abs_timeout *timo,
+                     struct packet_pong *pong)
 {
     return rendezvous_consume(&pong_rendezvous, pong, timo);
 }
