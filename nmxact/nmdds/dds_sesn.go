@@ -62,6 +62,20 @@ func NewDdsSesn(dx *DdsXport, cfg sesn.SesnCfg) (*DdsSesn, error) {
 	return s, nil
 }
 
+func (s *DdsSesn) rx(bytes []byte) error {
+	s.mopen.Lock()
+	if !s.isopen {
+		s.mopen.Unlock()
+		return nmxutil.NewSesnClosedError(
+			"Attempt to receive on closed dds session")
+	}
+	s.mopen.Unlock()
+
+	s.txvr.DispatchNmpRsp(bytes)
+
+	return nil
+}
+
 func (s *DdsSesn) Open() error {
 	s.mopen.Lock()
 

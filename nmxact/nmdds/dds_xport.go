@@ -20,6 +20,7 @@
 package nmdds
 
 // #cgo LDFLAGS: -L ../../ddslib -l ddsmgr
+// #include <stdlib.h>
 // #include "../../ddslib/src/ddsmgr.h"
 import "C"
 
@@ -29,6 +30,7 @@ import (
 	"regexp"
 	"sync"
 	"time"
+	"unsafe"
 
 	"mynewt.apache.org/newtmgr/nmxact/sesn"
 )
@@ -149,9 +151,55 @@ func (dx *DdsXport) BuildSesn(cfg sesn.SesnCfg) (sesn.Sesn, error) {
 }
 
 func (dx *DdsXport) Tx(bytes []byte) error {
-	return fmt.Errorf("DdsXport.Tx() not yet implemented")
-}
+	abstimeout := C.struct_abs_timeout{}
+	packetmcmd := C.struct_packet_mcmd{}
+	packetmrsp := C.struct_packet_mrsp{}
 
-func (dx *DdsXport) Rx() ([]byte, error) {
-	return nil, fmt.Errorf("DdsXport.Rx() not yet implemented")
+	timeout := time.Now().Add(dx.cfg.CommTimeout)
+	abstimeout.seconds = C.ulong(timeout.Unix())
+	abstimeout.nseconds = C.long(timeout.Nanosecond())
+
+	requestid := rand.Int31()
+	devicename := C.CString(dx.devname)
+	defer C.free(unsafe.Pointer(devicename))
+	packetmcmd.request_id = C.int(requestid)
+	packetmcmd.device_name = devicename
+	packetmcmd.cmd_size = C.int(len(bytes))
+	packetmcmd.cmd_data = (*C.char)(unsafe.Pointer(&bytes[0]))
+
+	var rc C.int
+	var rsp []byte
+
+	C.ddsmgr_mrsp_listen()
+	C.ddsmgr_mcmd_send(&packetmcmd)
+	for {
+		rc = C.ddsmgr_mrsp_recv(&abstimeout, &packetmrsp)
+		if rc != 0 {
+			break
+		}
+
+		in_requestid := int32(packetmrsp.request_id)
+		in_rspdata := C.GoBytes(unsafe.Pointer(&packetmrsp.rsp_data[0]),
+		                        packetmrsp.rsp_size)
+
+		if in_requestid == requestid {
+			rsp = in_rspdata
+			break
+		}
+	}
+	C.ddsmgr_mrsp_reject()
+
+	if rc != 0 {
+		return fmt.Errorf("Did not receive a dds command response")
+	}
+
+	dx.mutex.Lock()
+	rspsesn := dx.rspsesn
+	dx.mutex.Unlock()
+
+	if rspsesn == nil {
+		return fmt.Errorf("Received dds response with no session")
+	}
+
+	return rspsesn.rx(rsp)
 }
