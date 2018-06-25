@@ -89,7 +89,23 @@ static void find_ipv4_intfs(struct ipv4_intfs *intfs)
 }
 
 static struct matcherwait init_matchwait;
+static struct rendezvous mrsp_rendezvous;
 static struct rendezvous pong_rendezvous;
+
+static void convert_packet_mrsp(void *dst,
+                                const void *src)
+{
+    struct packet_mrsp *dstmrsp;
+    const PacketMRsp *srcmrsp;
+
+    dstmrsp = dst;
+    srcmrsp = src;
+
+    dstmrsp->request_id = srcmrsp->request_id;
+    dstmrsp->rsp_size = srcmrsp->rsp_size;
+    memcpy(dstmrsp->rsp_data, srcmrsp->rsp_data,
+           dstmrsp->rsp_size);
+}
 
 static void convert_packet_pong(void *dst,
                                 const void *src)
@@ -114,6 +130,21 @@ static void print_error(const char *fmt, ...)
     va_end(arg);
 }
 
+static void mrsp_received(const PacketMRsp *mrsp)
+{
+    rendezvous_produce(&mrsp_rendezvous, mrsp);
+}
+
+static void mrsp_submatched(void)
+{
+    matcherwait_wake(&init_matchwait, MATCHERTYPE_MRSP);
+}
+
+static void mcmd_pubmatched(void)
+{
+    matcherwait_wake(&init_matchwait, MATCHERTYPE_MCMD);
+}
+
 static void pong_received(const PacketPong *pong)
 {
     rendezvous_produce(&pong_rendezvous, pong);
@@ -136,6 +167,7 @@ int ddsmgr_initialize(const struct abs_timeout *timo)
     find_ipv4_intfs(&intfs);
 
     matcherwait_initialize(&init_matchwait);
+    rendezvous_initialize(&mrsp_rendezvous, convert_packet_mrsp);
     rendezvous_initialize(&pong_rendezvous, convert_packet_pong);
 
     if (dds_create(print_error, &intfs))
@@ -144,9 +176,20 @@ int ddsmgr_initialize(const struct abs_timeout *timo)
         return 1;
     }
 
+    if (dds_mrsp_subscriber(mrsp_submatched, mrsp_received))
+    {
+        fprintf(stderr, "dds_mrsp_subscriber failed\n");
+    }
+
     if (dds_pong_subscriber(pong_submatched, pong_received))
     {
         fprintf(stderr, "dds_pong_subscriber failed\n");
+        return 1;
+    }
+
+    if (dds_mcmd_publisher(mcmd_pubmatched))
+    {
+        fprintf(stderr, "dds_mcmd_publisher failed\n");
         return 1;
     }
 
@@ -169,6 +212,30 @@ int ddsmgr_initialize(const struct abs_timeout *timo)
     }
 
     return 0;
+}
+
+void ddsmgr_mcmd_send(const struct packet_mcmd *mcmd)
+{
+    dds_mcmd_publish(mcmd->request_id,
+                     mcmd->device_name,
+                     mcmd->cmd_size,
+                     mcmd->cmd_data);
+}
+
+int ddsmgr_mrsp_recv(const struct abs_timeout *timo,
+                     struct packet_mrsp *mrsp)
+{
+    return rendezvous_consume(&mrsp_rendezvous, mrsp, timo);
+}
+
+void ddsmgr_mrsp_listen(void)
+{
+    rendezvous_listen(&mrsp_rendezvous);
+}
+
+void ddsmgr_mrsp_reject(void)
+{
+    rendezvous_reject(&mrsp_rendezvous);
 }
 
 void ddsmgr_ping_send(const struct packet_ping *ping)

@@ -6,6 +6,19 @@ struct abs_timeout {
     long nseconds;
 };
 
+struct packet_mcmd {
+    int request_id;
+    char device_name[16];
+    int cmd_size;
+    char cmd_data[512];
+};
+
+struct packet_mrsp {
+    int request_id;
+    int rsp_size;
+    char rsp_data[1024];
+};
+
 struct packet_ping {
     int request_id;
 };
@@ -16,6 +29,13 @@ struct packet_pong {
 };
 
 int ddsmgr_initialize(const struct abs_timeout *timo);
+
+void ddsmgr_mcmd_send(const struct packet_mcmd *mcmd);
+
+int ddsmgr_mrsp_recv(const struct abs_timeout *timo,
+                     struct packet_mrsp *mrsp);
+void ddsmgr_mrsp_listen(void);
+void ddsmgr_mrsp_reject(void);
 
 void ddsmgr_ping_send(const struct packet_ping *ping);
 

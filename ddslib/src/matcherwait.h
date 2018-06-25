@@ -5,9 +5,11 @@
 #include "ddsmgr.h"
 
 enum matchertype {
-    MATCHERTYPE_PING = 0,
-    MATCHERTYPE_PONG = 1,
-    MATCHERTYPE_MAX  = 2,
+    MATCHERTYPE_MCMD = 0,
+    MATCHERTYPE_MRSP = 1,
+    MATCHERTYPE_PING = 2,
+    MATCHERTYPE_PONG = 3,
+    MATCHERTYPE_MAX  = 4,
 };
 
 struct matcherwait {
