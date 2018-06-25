@@ -162,10 +162,12 @@ func (dx *DdsXport) Tx(bytes []byte) error {
 	requestid := rand.Int31()
 	devicename := C.CString(dx.devname)
 	defer C.free(unsafe.Pointer(devicename))
+	cmddata := C.CBytes(bytes)
+	defer C.free(unsafe.Pointer(cmddata))
 	packetmcmd.request_id = C.int(requestid)
 	packetmcmd.device_name = devicename
 	packetmcmd.cmd_size = C.int(len(bytes))
-	packetmcmd.cmd_data = (*C.char)(unsafe.Pointer(&bytes[0]))
+	packetmcmd.cmd_data = (*C.char)(unsafe.Pointer(cmddata))
 
 	var rc C.int
 	var rsp []byte
