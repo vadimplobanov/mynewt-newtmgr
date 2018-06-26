@@ -166,8 +166,8 @@ func (dx *DdsXport) Tx(bytes []byte) error {
 	defer C.free(unsafe.Pointer(cmddata))
 	packetmcmd.request_id = C.int(requestid)
 	packetmcmd.device_name = devicename
-	packetmcmd.cmd_size = C.int(len(bytes))
 	packetmcmd.cmd_data = (*C.char)(unsafe.Pointer(cmddata))
+	packetmcmd.cmd_size = C.int(len(bytes))
 
 	var rc C.int
 	var rsp []byte

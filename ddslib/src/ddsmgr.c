@@ -8,6 +8,8 @@
 #include "matcherwait.h"
 #include "rendezvous.h"
 
+#define MIN(a, b) ((a) < (b) ? (a) : (b))
+
 static int valid_ipv4_ifaddr(const struct ifaddrs *ifaddr)
 {
     return ifaddr->ifa_name != NULL &&
@@ -92,26 +94,26 @@ static struct matcherwait init_matchwait;
 static struct rendezvous mrsp_rendezvous;
 static struct rendezvous pong_rendezvous;
 
-static void convert_packet_mrsp(void *dst,
-                                const void *src)
+static void convert_packet_mrsp(void *dst, void *src)
 {
     struct packet_mrsp *dstmrsp;
-    const PacketMRsp *srcmrsp;
+    PacketMRsp *srcmrsp;
 
     dstmrsp = dst;
     srcmrsp = src;
 
     dstmrsp->request_id = srcmrsp->request_id;
-    dstmrsp->rsp_size = srcmrsp->rsp_size;
-    memcpy(dstmrsp->rsp_data, srcmrsp->rsp_data,
-           dstmrsp->rsp_size);
+    dstmrsp->rsp_size = MIN(DDS_CharSeq_get_length(&srcmrsp->rsp_data),
+                            sizeof(dstmrsp->rsp_data));
+    DDS_CharSeq_to_array(&srcmrsp->rsp_data,
+                         (DDS_Char *)dstmrsp->rsp_data,
+                         dstmrsp->rsp_size);
 }
 
-static void convert_packet_pong(void *dst,
-                                const void *src)
+static void convert_packet_pong(void *dst, void *src)
 {
     struct packet_pong *dstpong;
-    const PacketPong *srcpong;
+    PacketPong *srcpong;
 
     dstpong = dst;
     srcpong = src;
@@ -130,7 +132,7 @@ static void print_error(const char *fmt, ...)
     va_end(arg);
 }
 
-static void mrsp_received(const PacketMRsp *mrsp)
+static void mrsp_received(PacketMRsp *mrsp)
 {
     rendezvous_produce(&mrsp_rendezvous, mrsp);
 }
@@ -145,7 +147,7 @@ static void mcmd_pubmatched(void)
     matcherwait_wake(&init_matchwait, MATCHERTYPE_MCMD);
 }
 
-static void pong_received(const PacketPong *pong)
+static void pong_received(PacketPong *pong)
 {
     rendezvous_produce(&pong_rendezvous, pong);
 }
@@ -218,8 +220,8 @@ void ddsmgr_mcmd_send(const struct packet_mcmd *mcmd)
 {
     dds_mcmd_publish(mcmd->request_id,
                      mcmd->device_name,
-                     mcmd->cmd_size,
-                     mcmd->cmd_data);
+                     mcmd->cmd_data,
+                     mcmd->cmd_size);
 }
 
 int ddsmgr_mrsp_recv(const struct abs_timeout *timo,

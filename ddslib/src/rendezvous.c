@@ -1,13 +1,13 @@
 #include "rendezvous.h"
 
 void rendezvous_initialize(struct rendezvous *rendezvous,
-                           void (*convert)(void *dst, const void *src))
+                           void (*convert)(void *dst, void *src))
 {
     pthread_mutex_init(&rendezvous->mutex, NULL);
     pthread_cond_init(&rendezvous->condvar, NULL);
     rendezvous->enabled = 0;
-    rendezvous->srcwait = NULL;
     rendezvous->dstwait = NULL;
+    rendezvous->srcwait = NULL;
     rendezvous->convert = convert;
 }
 
@@ -64,7 +64,7 @@ unlock:
 }
 
 int rendezvous_produce(struct rendezvous *rendezvous,
-                       const void *srcdata)
+                       void *srcdata)
 {
     int result, wakeup;
 
@@ -122,14 +122,14 @@ void rendezvous_reject(struct rendezvous *rendezvous)
 
     wakeup = 0;
     pthread_mutex_lock(&rendezvous->mutex);
-    if (rendezvous->srcwait)
-    {
-        rendezvous->srcwait = NULL;
-        wakeup = 1;
-    }
     if (rendezvous->dstwait)
     {
         rendezvous->dstwait = NULL;
+        wakeup = 1;
+    }
+    if (rendezvous->srcwait)
+    {
+        rendezvous->srcwait = NULL;
         wakeup = 1;
     }
     rendezvous->enabled = 0;

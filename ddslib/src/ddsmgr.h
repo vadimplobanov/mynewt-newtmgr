@@ -9,8 +9,8 @@ struct abs_timeout {
 struct packet_mcmd {
     int request_id;
     const char *device_name;
-    int cmd_size;
     const char *cmd_data;
+    int cmd_size;
 };
 
 struct packet_mrsp {
