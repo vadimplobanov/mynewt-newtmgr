@@ -1,4 +1,5 @@
 #include <netinet/in.h>
+#include <net/if.h>
 #include <assert.h>
 #include <ifaddrs.h>
 #include <stdarg.h>
@@ -38,7 +39,7 @@ static void copy_ipv4_intf(const struct ifaddrs *ifaddr,
 static const char *external_intf_prefixes[] =
 {
     "en",
-    "vir",
+    "wlo",
     "",
 };
 
