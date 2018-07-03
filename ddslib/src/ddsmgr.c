@@ -124,13 +124,16 @@ static void convert_packet_pong(void *dst, void *src)
            sizeof(dstpong->device_name));
 }
 
-static void print_error(const char *fmt, ...)
+static int print_error(const char *fmt, ...)
 {
     va_list arg;
+    int res;
 
     va_start(arg, fmt);
-    vfprintf(stderr, fmt, arg);
+    res = vfprintf(stderr, fmt, arg);
     va_end(arg);
+
+    return res;
 }
 
 static void mrsp_received(PacketMRsp *mrsp)
