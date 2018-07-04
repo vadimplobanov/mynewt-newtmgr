@@ -11,6 +11,11 @@
 
 #define MIN(a, b) ((a) < (b) ? (a) : (b))
 
+struct ip4ifdesc {
+    uint32_t address;
+    uint32_t netmask;
+};
+
 static int valid_ipv4_ifaddr(const struct ifaddrs *ifaddr)
 {
     return ifaddr->ifa_name != NULL &&
@@ -21,7 +26,7 @@ static int valid_ipv4_ifaddr(const struct ifaddrs *ifaddr)
 }
 
 static void copy_ipv4_intf(const struct ifaddrs *ifaddr,
-                           struct ipv4_intf *intf)
+                           struct ip4ifdesc *ifdesc)
 {
     uint32_t address, netmask;
 
@@ -29,11 +34,8 @@ static void copy_ipv4_intf(const struct ifaddrs *ifaddr,
     netmask = ((const struct sockaddr_in *)ifaddr->ifa_netmask)->sin_addr.s_addr;
     address = ntohl(address);
     netmask = ntohl(netmask);
-
-    strncpy(intf->ifname, ifaddr->ifa_name, sizeof(intf->ifname) - 1);
-    intf->ifname[sizeof(intf->ifname) - 1] = '\0';
-    intf->address = address;
-    intf->netmask = netmask;
+    ifdesc->address = address;
+    ifdesc->netmask = netmask;
 }
 
 static const char *external_intf_prefixes[] =
@@ -43,14 +45,15 @@ static const char *external_intf_prefixes[] =
     "",
 };
 
-static void find_ipv4_intfs(struct ipv4_intfs *intfs)
+static void find_ipv4_intfs(struct ip4ifdesc *ifdesc)
 {
     struct ifaddrs *ifaddrs, *ifaddr;
     uint32_t i;
 
     getifaddrs(&ifaddrs);
 
-    intfs->nintfs = 0;
+    ifdesc->address = 0;
+    ifdesc->netmask = 0;
 
     for (i = 0; i < sizeof(external_intf_prefixes) /
                     sizeof(*external_intf_prefixes); i++)
@@ -66,29 +69,15 @@ static void find_ipv4_intfs(struct ipv4_intfs *intfs)
             if (valid_ipv4_ifaddr(ifaddr) &&
                 strncmp(ifaddr->ifa_name, prefixptr, prefixlen) == 0)
             {
-                copy_ipv4_intf(ifaddr, intfs->intfs + intfs->nintfs);
-                intfs->nintfs++;
-                i = sizeof(external_intf_prefixes) /
-                    sizeof(*external_intf_prefixes);
-                break;
+                copy_ipv4_intf(ifaddr, ifdesc);
+                goto done;
             }
         }
     }
 
-    for (ifaddr = ifaddrs; ifaddr != NULL; ifaddr = ifaddr->ifa_next)
-    {
-        if (valid_ipv4_ifaddr(ifaddr) &&
-            strcmp(ifaddr->ifa_name, "lo") == 0)
-        {
-            copy_ipv4_intf(ifaddr, intfs->intfs + intfs->nintfs);
-            intfs->nintfs++;
-            break;
-        }
-    }
+done:
 
     freeifaddrs(ifaddrs);
-
-    assert(intfs->nintfs != 0);
 }
 
 static struct matcherwait init_matchwait;
@@ -168,15 +157,15 @@ static void ping_pubmatched(void)
 
 int ddsmgr_initialize(const struct abs_timeout *timo)
 {
-    struct ipv4_intfs intfs;
+    struct ip4ifdesc ifdesc;
 
-    find_ipv4_intfs(&intfs);
+    find_ipv4_intfs(&ifdesc);
 
     matcherwait_initialize(&init_matchwait);
     rendezvous_initialize(&mrsp_rendezvous, convert_packet_mrsp);
     rendezvous_initialize(&pong_rendezvous, convert_packet_pong);
 
-    if (dds_create(print_error, &intfs))
+    if (dds_create(print_error, ifdesc.address, ifdesc.netmask))
     {
         fprintf(stderr, "dds_create failed\n");
         return 1;
